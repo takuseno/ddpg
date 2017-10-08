@@ -7,16 +7,14 @@ import numpy as np
 import tensorflow as tf
 
 from lightsaber.tensorflow.util import initialize
-from lightsaber.rl.explorer import LinearDecayExplorer
 from lightsaber.rl.replay_buffer import ReplayBuffer
-from actions import get_action_space
-from network import make_cnn
+from network import make_actor_network, make_critic_network
 from agent import Agent
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--env', type=str, default='PongDeterministic-v4')
+    parser.add_argument('--env', type=str, default='Pendulum-v0')
     parser.add_argument('--outdir', type=str, default=None)
     parser.add_argument('--logdir', type=str, default=None)
     parser.add_argument('--gpu', type=int, default=0)
@@ -40,20 +38,18 @@ def main():
 
     env = gym.make(args.env)
 
-    actions = get_action_space(args.env)
-    n_actions = len(actions)
+    obs_dim = env.observation_space.shape[0]
+    n_actions = env.action_space.shape[0]
+    action_bound = env.action_space.high
 
-    model = make_cnn(
-        convs=[(32, 8, 4), (64, 4, 2), (64, 3, 1)],
-        hiddens=[512]
-    )
+    actor = make_actor_network([400, 300])
+    critic = make_critic_network()
     replay_buffer = ReplayBuffer(10 ** 5)
-    explorer = LinearDecayExplorer(final_exploration_step=args.final_exploration_frames)
 
     sess = tf.Session()
     sess.__enter__()
 
-    agent = Agent(model, n_actions, replay_buffer, explorer, learning_starts=10000)
+    agent = Agent(actor, critic, obs_dim, n_actions, replay_buffer, action_bound)
 
     initialize()
 
@@ -70,7 +66,6 @@ def main():
     episode = 0
 
     while True:
-        states = np.zeros((args.update_interval, 84, 84), dtype=np.uint8)
         reward = 0
         done = False
         clipped_reward = 0
@@ -82,18 +77,13 @@ def main():
             if args.render:
                 env.render()
 
-            state = cv2.cvtColor(state, cv2.COLOR_RGB2GRAY)
-            state = cv2.resize(state, (84, 84))
-            states = np.roll(states, 1, axis=0)
-            states[0] = state
-
             if done:
                 summary, _ = sess.run([merged, reward_summary], feed_dict={reward_summary: sum_of_rewards})
                 train_writer.add_summary(summary, global_step)
-                agent.stop_episode_and_train(np.transpose(states, [1, 2, 0]), clipped_reward, done=done)
+                agent.stop_episode_and_train(state, clipped_reward, done=done)
                 break
 
-            action = actions[agent.act_and_train(np.transpose(states, [1, 2, 0]), clipped_reward)]
+            action = agent.act_and_train(state, clipped_reward)
 
             state, reward, done, info = env.step(action)
 

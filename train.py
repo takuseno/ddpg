@@ -42,7 +42,7 @@ def main():
     n_actions = env.action_space.shape[0]
     action_bound = env.action_space.high
 
-    actor = make_actor_network([400, 300])
+    actor = make_actor_network([30])
     critic = make_critic_network()
     replay_buffer = ReplayBuffer(10 ** 5)
 
@@ -83,9 +83,10 @@ def main():
                 agent.stop_episode_and_train(state, clipped_reward, done=done)
                 break
 
-            action = agent.act_and_train(state, clipped_reward)
+            action = agent.act_and_train(state, reward, episode)
+            print(action)
 
-            state, reward, done, info = env.step(action)
+            state, reward, done, info = env.step(action * action_bound)
 
             if reward > 0:
                 clipped_reward = 1.0

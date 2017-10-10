@@ -44,7 +44,7 @@ def main():
 
     actor = make_actor_network([30])
     critic = make_critic_network()
-    replay_buffer = ReplayBuffer(10 ** 5)
+    replay_buffer = ReplayBuffer(10 ** 4)
 
     sess = tf.Session()
     sess.__enter__()

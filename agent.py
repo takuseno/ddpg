@@ -25,7 +25,7 @@ class OrnsteinUhlenbeckActionNoise:
 
 class Agent(object):
     def __init__(self, actor, critic, obs_dim, num_actions, replay_buffer, bound,
-            lr=2.5e-4, batch_size=32, gamma=0.99, target_network_update_freq=20):
+            lr=2.5e-4, batch_size=32, gamma=0.9, target_network_update_freq=20):
         self.batch_size = batch_size
         self.num_actions = num_actions
         self.gamma = gamma
@@ -60,15 +60,15 @@ class Agent(object):
 
     def act_and_train(self, obs, reward, episode):
         action = np.random.normal(self._act([obs])[0], self.exploration)
-        action = np.clip(action, -1, 1)
-        self.exploration *= 0.9995
+        action = np.clip(action, -2, 2)
         print(self.exploration)
 
-        if self.t > self.batch_size:
+        if self.t > 10000:
+            self.exploration *= 0.9995
             obs_t, actions, rewards, obs_tp1, dones = self.replay_buffer.sample(self.batch_size)
             obs_t = np.array(obs_t, dtype=np.float32)
             obs_tp1 = np.array(obs_tp1, dtype=np.float32)
-            actor_error = self._train_actor(obs_t, actions, rewards, obs_tp1, dones)
+            actor_error = self._train_actor(obs_t)
             critic_error = self._train_critic(obs_t, actions, rewards, obs_tp1, dones)
             self._update_target()
             print(actor_error, critic_error)

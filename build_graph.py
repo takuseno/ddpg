@@ -35,13 +35,19 @@ def build_train(actor, critic, obs_dim, num_actions, bound, optimizer,
         critic_loss = tf.reduce_mean(tf.square(target_q - q_t), name='critic_loss')
         actor_loss = tf.negative(tf.reduce_mean(q_t_with_actor), name='actor_loss')
 
+        a_grads = tf.gradients(actor_loss, policy_t)
+        policy_grads = tf.gradients(ys=policy_t, xs=actor_func_vars, grad_ys=a_grads)
+
         # optimize operations
         critic_optimizer = tf.train.AdamOptimizer(0.001)
-        critic_gradients = critic_optimizer.compute_gradients(critic_loss, var_list=critic_func_vars)
-        critic_optimize_expr = critic_optimizer.apply_gradients(critic_gradients)
+        #critic_gradients = critic_optimizer.compute_gradients(critic_loss, var_list=critic_func_vars)
+        #critic_optimize_expr = critic_optimizer.apply_gradients(critic_gradients)
+        critic_optimize_expr = critic_optimizer.minimize(critic_loss, var_list=critic_func_vars)
         actor_optimizer = tf.train.AdamOptimizer(0.001)
-        actor_gradients = actor_optimizer.compute_gradients(actor_loss, var_list=actor_func_vars)
-        actor_optimize_expr = actor_optimizer.apply_gradients(actor_gradients)
+        #actor_gradients = actor_optimizer.compute_gradients(actor_loss, var_list=actor_func_vars)
+        #actor_optimize_expr = actor_optimizer.apply_gradients(actor_gradients)
+        actor_optimize_expr = actor_optimizer.apply_gradients(zip(policy_grads, actor_func_vars))
+        #actor_optimize_expr = actor_optimizer.minimize(actor_loss, var_list=actor_func_vars)
 
         # update target operations
         update_target_expr = []
@@ -61,7 +67,7 @@ def build_train(actor, critic, obs_dim, num_actions, bound, optimizer,
         # train theano-style function
         train_actor = util.function(
             inputs=[
-                obs_t_input, act_t_ph, rew_t_ph, obs_tp1_input, done_mask_ph
+                obs_t_input
             ],
             outputs=[actor_loss],
             updates=[actor_optimize_expr]

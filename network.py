@@ -10,9 +10,14 @@ def _make_actor_network(hiddens, inpt, num_actions, scope='actor', reuse=None):
                 bias_initializer=tf.constant_initializer(0.1),
                 kernel_initializer=tf.random_normal_initializer(0.0, 0.3))
             out = tf.nn.relu(out)
-        out = tf.layers.dense(out, num_actions,
-                kernel_initializer=tf.random_uniform_initializer(minval=-3e-3, maxval=3e-3), name='d2')
-        out = tf.nn.tanh(out)
+        mu = tf.layers.dense(out, num_actions,
+                kernel_initializer=tf.random_uniform_initializer(minval=-3e-3, maxval=3e-3), name='mu')
+        mu = tf.nn.tanh(mu)
+
+        sigma = tf.layers.dense(out, num_actions,
+                kernel_initializer=tf.random_uniform_initializer(minval=-3e-3, maxval=3e-3), name='sigma')
+        sigma = tf.nn.softplus(sigma)
+        out = tf.squeeze(tf.distributions.Normal(mu, sigma).sample(num_actions), [0])
     return out
 
 def _make_critic_network(inpt, action, num_actions, scope='critic', reuse=None):

@@ -35,8 +35,8 @@ class Agent(object):
         return self._act([obs])[0]
 
     def act_and_train(self, obs, reward, episode):
-        action = np.random.normal(self._act([obs])[0], self.exploration)
-        action = np.clip(action, -2, 2)
+        action = self._act([obs])[0]
+        action = np.clip(action, -1, 1)
         reward /= 10.0
 
         if self.t > 10000:

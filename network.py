@@ -17,6 +17,8 @@ def _make_actor_network(hiddens, inpt, num_actions, scope='actor', reuse=None):
         sigma = tf.layers.dense(out, num_actions,
                 kernel_initializer=tf.random_uniform_initializer(minval=-3e-3, maxval=3e-3), name='sigma')
         sigma = tf.nn.softplus(sigma)
+
+        # define stochastic policy as normal distribution instead of adding noise to action
         out = tf.squeeze(tf.distributions.Normal(mu, sigma).sample(num_actions), [0])
     return out
 

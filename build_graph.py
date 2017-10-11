@@ -2,8 +2,7 @@ import tensorflow as tf
 import lightsaber.tensorflow.util as util
 
 
-def build_train(actor, critic, obs_dim, num_actions, bound, optimizer,
-                grad_norm_clipping=10.0, gamma=1.0, scope='ddpg', reuse=None):
+def build_train(actor, critic, obs_dim, num_actions, gamma=1.0, scope='ddpg', reuse=None):
     with tf.variable_scope(scope, reuse=reuse):
         # input placeholders
         obs_t_input = tf.placeholder(tf.float32, [None, obs_dim], name='obs_t')
@@ -13,11 +12,11 @@ def build_train(actor, critic, obs_dim, num_actions, bound, optimizer,
         done_mask_ph = tf.placeholder(tf.float32, [None], name='done')
 
         # actor network
-        policy_t = actor(obs_t_input, num_actions, bound, scope='actor')
+        policy_t = actor(obs_t_input, num_actions, scope='actor')
         actor_func_vars = util.scope_vars(util.absolute_scope_name('actor'), trainable_only=True)
 
         # target actor network
-        policy_tp1 = actor(obs_tp1_input, num_actions, bound, scope='target_actor')
+        policy_tp1 = actor(obs_tp1_input, num_actions, scope='target_actor')
         target_actor_func_vars = util.scope_vars(util.absolute_scope_name('target_actor'), trainable_only=True)
 
         # critic network
@@ -31,35 +30,33 @@ def build_train(actor, critic, obs_dim, num_actions, bound, optimizer,
 
         # loss
         with tf.variable_scope('target_q'):
-            target_q = rew_t_ph + (1 - done_mask_ph) * gamma * q_tp1
+            target_q = rew_t_ph + (1 - done_mask_ph) * gamma * tf.stop_gradient(q_tp1)
         critic_loss = tf.reduce_mean(tf.square(target_q - q_t), name='critic_loss')
-        actor_loss = tf.negative(tf.reduce_mean(q_t_with_actor), name='actor_loss')
-
-        a_grads = tf.gradients(actor_loss, policy_t)
-        policy_grads = tf.gradients(ys=policy_t, xs=actor_func_vars, grad_ys=a_grads)
+        actor_loss = -tf.reduce_mean(q_t_with_actor, name='actor_loss')
 
         # optimize operations
         critic_optimizer = tf.train.AdamOptimizer(0.001)
-        #critic_gradients = critic_optimizer.compute_gradients(critic_loss, var_list=critic_func_vars)
-        #critic_optimize_expr = critic_optimizer.apply_gradients(critic_gradients)
         critic_optimize_expr = critic_optimizer.minimize(critic_loss, var_list=critic_func_vars)
         actor_optimizer = tf.train.AdamOptimizer(0.001)
-        #actor_gradients = actor_optimizer.compute_gradients(actor_loss, var_list=actor_func_vars)
-        #actor_optimize_expr = actor_optimizer.apply_gradients(actor_gradients)
-        actor_optimize_expr = actor_optimizer.apply_gradients(zip(policy_grads, actor_func_vars))
-        #actor_optimize_expr = actor_optimizer.minimize(actor_loss, var_list=actor_func_vars)
+        actor_optimize_expr = actor_optimizer.minimize(actor_loss, var_list=actor_func_vars)
 
-        # update target operations
-        update_target_expr = []
-        # assign critic variables to target critic variables
-        for var, var_target in zip(sorted(critic_func_vars, key=lambda v: v.name),
-                                    sorted(target_critic_func_vars, key=lambda v: v.name)):
-            update_target_expr.append(var_target.assign(var))
-        # assign actor variables to target actor variables
-        for var, var_target in zip(sorted(actor_func_vars, key=lambda v: v.name),
-                                    sorted(target_actor_func_vars, key=lambda v: v.name)):
-            update_target_expr.append(var_target.assign(var))
-        update_target_expr = tf.group(*update_target_expr)
+        # update critic target operations
+        with tf.variable_scope('update_critic_target'):
+            update_critic_target_expr = []
+            # assign critic variables to target critic variables
+            for var, var_target in zip(sorted(critic_func_vars, key=lambda v: v.name),
+                                        sorted(target_critic_func_vars, key=lambda v: v.name)):
+                update_critic_target_expr.append(var_target.assign(var))
+            update_critic_target_expr = tf.group(*update_critic_target_expr)
+
+        # update actor target operations
+        with tf.variable_scope('update_actor_target'):
+            update_actor_target_expr = []
+            # assign actor variables to target actor variables
+            for var, var_target in zip(sorted(actor_func_vars, key=lambda v: v.name),
+                                        sorted(target_actor_func_vars, key=lambda v: v.name)):
+                update_actor_target_expr.append(var_target.assign(var))
+            update_actor_target_expr = tf.group(*update_actor_target_expr)
 
         # action theano-style function
         act = util.function(inputs=[obs_t_input], outputs=policy_t)
@@ -81,6 +78,7 @@ def build_train(actor, critic, obs_dim, num_actions, bound, optimizer,
         )
 
         # update target theano-style function
-        update_target = util.function([], [], updates=[update_target_expr])
+        update_actor_target = util.function([], [], updates=[update_actor_target_expr])
+        update_critic_target = util.function([], [], updates=[update_critic_target_expr])
 
-        return act, train_actor, train_critic, update_target
+        return act, train_actor, train_critic, update_actor_target, update_critic_target

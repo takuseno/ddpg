@@ -44,7 +44,7 @@ def main():
 
     actor = make_actor_network([30])
     critic = make_critic_network()
-    replay_buffer = ReplayBuffer(10 ** 4)
+    replay_buffer = ReplayBuffer(10 ** 5)
 
     sess = tf.Session()
     sess.__enter__()
@@ -68,7 +68,6 @@ def main():
     while True:
         reward = 0
         done = False
-        clipped_reward = 0
         sum_of_rewards = 0
         step = 0
         state = env.reset()
@@ -80,20 +79,13 @@ def main():
             if done:
                 summary, _ = sess.run([merged, reward_summary], feed_dict={reward_summary: sum_of_rewards})
                 train_writer.add_summary(summary, global_step)
-                agent.stop_episode_and_train(state, clipped_reward, done=done)
+                agent.stop_episode_and_train(state, reward, done=done)
                 break
 
             action = agent.act_and_train(state, reward, episode)
-            print(action)
 
             state, reward, done, info = env.step(action * action_bound)
 
-            if reward > 0:
-                clipped_reward = 1.0
-            elif reward < 0:
-                clipped_reward = -1.0
-            else:
-                clipped_reward = 0.0
             sum_of_rewards += reward
             step += 1
             global_step += 1

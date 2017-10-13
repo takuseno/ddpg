@@ -17,15 +17,10 @@ def main():
     parser.add_argument('--env', type=str, default='Pendulum-v0')
     parser.add_argument('--outdir', type=str, default=None)
     parser.add_argument('--logdir', type=str, default=None)
-    parser.add_argument('--gpu', type=int, default=0)
     parser.add_argument('--load', type=str, default=None)
     parser.add_argument('--final-exploration-frames',
                         type=int, default=10 ** 6)
     parser.add_argument('--final-steps', type=int, default=10 ** 7)
-    parser.add_argument('--replay-start-size', type=int, default=5 * 10 ** 4)
-    parser.add_argument('--target-update-interval',
-                        type=int, default=10 ** 4)
-    parser.add_argument('--update-interval', type=int, default=4)
     parser.add_argument('--render', action='store_true')
     args = parser.parse_args()
 
@@ -40,7 +35,6 @@ def main():
 
     obs_dim = env.observation_space.shape[0]
     n_actions = env.action_space.shape[0]
-    action_bound = env.action_space.high
 
     actor = make_actor_network([30])
     critic = make_critic_network()
@@ -49,7 +43,7 @@ def main():
     sess = tf.Session()
     sess.__enter__()
 
-    agent = Agent(actor, critic, obs_dim, n_actions, replay_buffer, action_bound)
+    agent = Agent(actor, critic, obs_dim, n_actions, replay_buffer)
 
     initialize()
 
@@ -84,7 +78,7 @@ def main():
 
             action = agent.act_and_train(state, reward, episode)
 
-            state, reward, done, info = env.step(action * action_bound)
+            state, reward, done, info = env.step(action)
 
             sum_of_rewards += reward
             step += 1

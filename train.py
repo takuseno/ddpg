@@ -10,13 +10,14 @@ from lightsaber.tensorflow.util import initialize
 from lightsaber.rl.replay_buffer import ReplayBuffer
 from network import make_actor_network, make_critic_network
 from agent import Agent
+from datetime import datetime
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='Pendulum-v0')
     parser.add_argument('--outdir', type=str, default=None)
-    parser.add_argument('--logdir', type=str, default=None)
+    parser.add_argument('--log', type=str, default=datetime.now().strftime("%Y%m%d%H%M%S"))
     parser.add_argument('--load', type=str, default=None)
     parser.add_argument('--final-exploration-frames',
                         type=int, default=10 ** 6)
@@ -28,15 +29,15 @@ def main():
         args.outdir = os.path.join(os.path.dirname(__file__), 'results')
         if not os.path.exists(args.outdir):
             os.makedirs(args.outdir)
-    if args.logdir is None:
-        args.logdir = os.path.join(os.path.dirname(__file__), 'logs')
+
+    logdir = os.path.join(os.path.dirname(__file__), 'logs/{}'.format(args.log))
 
     env = gym.make(args.env)
 
     obs_dim = env.observation_space.shape[0]
     n_actions = env.action_space.shape[0]
 
-    actor = make_actor_network([30])
+    actor = make_actor_network([64, 64])
     critic = make_critic_network()
     replay_buffer = ReplayBuffer(10 ** 5)
 
@@ -54,7 +55,7 @@ def main():
     reward_summary = tf.placeholder(tf.int32, (), name='reward_summary')
     tf.summary.scalar('reward_summary', reward_summary)
     merged = tf.summary.merge_all()
-    train_writer = tf.summary.FileWriter(args.logdir, sess.graph)
+    train_writer = tf.summary.FileWriter(logdir, sess.graph)
 
     global_step = 0
     episode = 0
@@ -71,7 +72,10 @@ def main():
                 env.render()
 
             if done:
-                summary, _ = sess.run([merged, reward_summary], feed_dict={reward_summary: sum_of_rewards})
+                summary, _ = sess.run(
+                    [merged, reward_summary],
+                    feed_dict={reward_summary: sum_of_rewards}
+                )
                 train_writer.add_summary(summary, global_step)
                 agent.stop_episode_and_train(state, reward, done=done)
                 break
@@ -85,13 +89,17 @@ def main():
             global_step += 1
 
             if global_step % 10 ** 6 == 0:
-                path = os.path.join(args.outdir, '{}/model.ckpt'.format(global_step))
+                file_name = '{}/model.ckpt'.format(global_step)
+                path = os.path.join(args.outdir, file_name)
                 saver.save(sess, path)
 
         episode += 1
 
         print('Episode: {}, Step: {}: Reward: {}'.format(
-                episode, global_step, sum_of_rewards))
+            episode,
+            global_step,
+            sum_of_rewards
+        ))
 
         if args.final_steps < global_step:
             break

@@ -6,33 +6,42 @@ def _make_actor_network(hiddens, inpt, num_actions, scope='actor', reuse=None):
     with tf.variable_scope(scope, reuse=reuse):
         out = inpt
         for hidden in hiddens:
-            out = tf.layers.dense(out, hidden, name='d1',
+            out = tf.layers.dense(out, hidden,
                 bias_initializer=tf.constant_initializer(0.1),
                 kernel_initializer=tf.random_normal_initializer(0.0, 0.3))
             out = tf.nn.relu(out)
-        mu = tf.layers.dense(out, num_actions,
-                kernel_initializer=tf.random_uniform_initializer(minval=-3e-3, maxval=3e-3), name='mu')
-        mu = tf.nn.tanh(mu)
-
-        sigma = tf.layers.dense(out, num_actions,
-                kernel_initializer=tf.random_uniform_initializer(minval=-3e-3, maxval=3e-3), name='sigma')
-        sigma = tf.nn.softplus(sigma)
-
-        # define stochastic policy as normal distribution instead of adding noise to action
-        out = tf.squeeze(tf.distributions.Normal(mu, sigma).sample(num_actions), [0])
+        out = tf.layers.dense(
+            out,
+            num_actions,
+            kernel_initializer=tf.random_uniform_initializer(
+                minval=-3e-3,
+                maxval=3e-3
+            )
+        )
+        out = tf.nn.tanh(out)
     return out
 
 def _make_critic_network(inpt, action, num_actions, scope='critic', reuse=None):
     with tf.variable_scope(scope, reuse=reuse):
-        out = tf.concat([inpt, action], axis=1)
-
-        out = tf.layers.dense(out, 30, name='d2',
+        out = tf.layers.dense(inpt, 64,
             bias_initializer=tf.constant_initializer(0.1),
             kernel_initializer=tf.random_normal_initializer(0.0, 0.3))
         out = tf.nn.relu(out)
 
-        out = tf.layers.dense(out, 1,
-            kernel_initializer=tf.random_uniform_initializer(minval=-3e-3, maxval=3e-3), name='d3')
+        out = tf.concat([out, action], axis=1)
+        out = tf.layers.dense(out, 64,
+            bias_initializer=tf.constant_initializer(0.1),
+            kernel_initializer=tf.random_normal_initializer(0.0, 0.3))
+        out = tf.nn.relu(out)
+
+        out = tf.layers.dense(
+            out,
+            1,
+            kernel_initializer=tf.random_uniform_initializer(
+                minval=-3e-3,
+                maxval=3e-3
+            )
+        )
     return out
 
 def make_actor_network(hiddens):

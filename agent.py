@@ -16,22 +16,17 @@ class Agent(object):
         self.exploration = 3
         self.replay_buffer = replay_buffer
 
-        act,\
-        train_actor,\
-        train_critic,\
-        update_actor_target,\
-        update_critic_target = build_graph.build_train(
+        self._act,\
+        self._train_actor,\
+        self._train_critic,\
+        self._update_actor_target,\
+        self._update_critic_target = build_graph.build_train(
             actor=actor,
             critic=critic,
             obs_dim=obs_dim,
             num_actions=num_actions,
             gamma=gamma
         )
-        self._act = act
-        self._train_actor = train_actor
-        self._train_critic = train_critic
-        self._update_actor_target = update_actor_target
-        self._update_critic_target = update_critic_target
 
     def act(self, obs):
         return self._act([obs])[0]

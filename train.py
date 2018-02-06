@@ -7,21 +7,21 @@ import numpy as np
 import tensorflow as tf
 
 from lightsaber.tensorflow.util import initialize
+from lightsaber.tensorflow.log import TfBoardLogger
 from lightsaber.rl.replay_buffer import ReplayBuffer
+from lightsaber.rl.trainer import Trainer
 from network import make_actor_network, make_critic_network
 from agent import Agent
 from datetime import datetime
 
 
 def main():
+    date = datetime.now().strftime("%Y%m%d%H%M%S")
     parser = argparse.ArgumentParser()
     parser.add_argument('--env', type=str, default='Pendulum-v0')
     parser.add_argument('--outdir', type=str, default=None)
-    parser.add_argument('--log', type=str, default=datetime.now().strftime("%Y%m%d%H%M%S"))
+    parser.add_argument('--log', type=str, default=date)
     parser.add_argument('--load', type=str, default=None)
-    parser.add_argument('--final-exploration-frames',
-                        type=int, default=10 ** 6)
-    parser.add_argument('--final-steps', type=int, default=10 ** 7)
     parser.add_argument('--render', action='store_true')
     args = parser.parse_args()
 
@@ -52,57 +52,19 @@ def main():
     if args.load is not None:
         saver.restore(sess, args.load)
 
-    reward_summary = tf.placeholder(tf.int32, (), name='reward_summary')
-    tf.summary.scalar('reward_summary', reward_summary)
-    merged = tf.summary.merge_all()
     train_writer = tf.summary.FileWriter(logdir, sess.graph)
+    logger = TfBoardLogger(train_writer)
+    logger.register('reward', dtype=tf.int32)
+    after_action = lambda s, r, t: logger.plot('reward', r, t)
 
-    global_step = 0
-    episode = 0
+    trainer = Trainer(
+        env=env,
+        agent=agent,
+        render=args.render,
+        after_action=after_action
+    )
 
-    while True:
-        reward = 0
-        done = False
-        sum_of_rewards = 0
-        step = 0
-        state = env.reset()
-
-        while True:
-            if args.render:
-                env.render()
-
-            if done:
-                summary, _ = sess.run(
-                    [merged, reward_summary],
-                    feed_dict={reward_summary: sum_of_rewards}
-                )
-                train_writer.add_summary(summary, global_step)
-                agent.stop_episode_and_train(state, reward, done=done)
-                break
-
-            action = agent.act_and_train(state, reward, episode)
-
-            state, reward, done, info = env.step(action)
-
-            sum_of_rewards += reward
-            step += 1
-            global_step += 1
-
-            if global_step % 10 ** 6 == 0:
-                file_name = '{}/model.ckpt'.format(global_step)
-                path = os.path.join(args.outdir, file_name)
-                saver.save(sess, path)
-
-        episode += 1
-
-        print('Episode: {}, Step: {}: Reward: {}'.format(
-            episode,
-            global_step,
-            sum_of_rewards
-        ))
-
-        if args.final_steps < global_step:
-            break
+    trainer.start()
 
 if __name__ == '__main__':
     main()

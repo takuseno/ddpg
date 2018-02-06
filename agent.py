@@ -1,3 +1,4 @@
+from lightsaber.rl.trainer import AgentInterface
 import network
 import build_graph
 import lightsaber.tensorflow.util as util
@@ -5,7 +6,7 @@ import numpy as np
 import tensorflow as tf
 
 
-class Agent(object):
+class Agent(AgentInterface):
     def __init__(self, actor, critic, obs_dim,
                 num_actions, replay_buffer, batch_size=16, gamma=0.9):
         self.batch_size = batch_size
@@ -28,15 +29,13 @@ class Agent(object):
             gamma=gamma
         )
 
-    def act(self, obs):
-        return self._act([obs])[0]
-
-    def act_and_train(self, obs, reward, episode):
+    def act(self, obs, reward, training):
+        obs = obs[0]
         action = np.random.normal(self._act([obs])[0], self.exploration)
         action = np.clip(action, -2, 2)
         reward /= 10.0
 
-        if self.t > 10000:
+        if training and self.t > 10000:
             self.exploration *= 0.9995
             obs_t,\
             actions,\
@@ -48,12 +47,13 @@ class Agent(object):
                 obs_t,
                 actions,
                 rewards,
-                obs_tp1, dones
+                obs_tp1,
+                dones
             )
             self._update_actor_target()
             self._update_critic_target()
 
-        if self.last_obs is not None:
+        if training and self.last_obs is not None:
             self.replay_buffer.append(
                 obs_t=self.last_obs,
                 action=self.last_action,
@@ -67,11 +67,15 @@ class Agent(object):
         self.last_action = action
         return action
 
-    def stop_episode_and_train(self, obs, reward, done=False):
-        self.replay_buffer.append(obs_t=self.last_obs,
-                action=self.last_action, reward=reward, obs_tp1=obs, done=done)
-        self.stop_episode()
-
-    def stop_episode(self):
+    def stop_episode(self, obs, reward, done=False, training=True):
+        obs = obs[0]
+        if training:
+            self.replay_buffer.append(
+                obs_t=self.last_obs,
+                action=self.last_action,
+                reward=reward,
+                obs_tp1=obs,
+                done=done
+            )
         self.last_obs = None
         self.last_action = []

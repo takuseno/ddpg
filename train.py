@@ -55,13 +55,13 @@ def main():
     train_writer = tf.summary.FileWriter(logdir, sess.graph)
     logger = TfBoardLogger(train_writer)
     logger.register('reward', dtype=tf.int32)
-    after_action = lambda s, r, t: logger.plot('reward', r, t)
+    end_episode = lambda r, t, e: logger.plot('reward', r, t)
 
     trainer = Trainer(
         env=env,
         agent=agent,
         render=args.render,
-        after_action=after_action
+        end_episode=end_episode
     )
 
     trainer.start()

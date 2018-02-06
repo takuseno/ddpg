@@ -23,6 +23,7 @@ def main():
     parser.add_argument('--log', type=str, default=date)
     parser.add_argument('--load', type=str, default=None)
     parser.add_argument('--render', action='store_true')
+    parser.add_argument('--demo', action='store_true')
     args = parser.parse_args()
 
     if args.outdir is None:
@@ -61,7 +62,8 @@ def main():
         env=env,
         agent=agent,
         render=args.render,
-        end_episode=end_episode
+        end_episode=end_episode,
+        training=not args.demo
     )
 
     trainer.start()

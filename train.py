@@ -10,6 +10,7 @@ from lightsaber.tensorflow.util import initialize
 from lightsaber.tensorflow.log import TfBoardLogger
 from lightsaber.rl.replay_buffer import ReplayBuffer
 from lightsaber.rl.trainer import Trainer
+from lightsaber.rl.env_wrapper import EnvWrapper
 from network import make_actor_network, make_critic_network
 from agent import Agent
 from datetime import datetime
@@ -34,9 +35,9 @@ def main():
     logdir = os.path.join(os.path.dirname(__file__), 'logs/{}'.format(args.log))
 
     env = gym.make(args.env)
-
     obs_dim = env.observation_space.shape[0]
     n_actions = env.action_space.shape[0]
+    env = EnvWrapper(env, r_preprocess=lambda r: r / 10.0)
 
     actor = make_actor_network([64, 64])
     critic = make_critic_network()

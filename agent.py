@@ -33,7 +33,6 @@ class Agent(AgentInterface):
         obs = obs[0]
         action = np.random.normal(self._act([obs])[0], self.exploration)
         action = np.clip(action, -2, 2)
-        reward /= 10.0
 
         if training and self.t > 10000:
             self.exploration *= 0.9995
